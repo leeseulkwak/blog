@@ -183,21 +183,22 @@ def index():
 
 @app.route('/generate', methods=['POST'])
 def generate():
-    data        = request.json
-    blog_type   = data.get('blog_type', 'restaurant')
-    length      = data.get('length', 'medium')
-    tone        = data.get('tone', 'friendly')
-    photo_count = data.get('photo_count', 5)
+    try:
+        data        = request.json
+        blog_type   = data.get('blog_type', 'restaurant')
+        length      = data.get('length', 'medium')
+        tone        = data.get('tone', 'friendly')
+        photo_count = data.get('photo_count', 5)
 
-    length_label, max_tokens = LENGTH_MAP.get(length, LENGTH_MAP['medium'])
-    system_prompt = (BASE_STYLE
-                     + TYPE_STYLE.get(blog_type, TYPE_STYLE['restaurant'])
-                     + '\n' + TONE_MAP.get(tone, TONE_MAP['friendly']))
+        length_label, max_tokens = LENGTH_MAP.get(length, LENGTH_MAP['medium'])
+        system_prompt = (BASE_STYLE
+                         + TYPE_STYLE.get(blog_type, TYPE_STYLE['restaurant'])
+                         + '\n' + TONE_MAP.get(tone, TONE_MAP['friendly']))
 
-    info_text   = build_info(data, blog_type)
-    hashtag_tip = HASHTAG_GUIDE.get(blog_type, '')
+        info_text   = build_info(data, blog_type)
+        hashtag_tip = HASHTAG_GUIDE.get(blog_type, '')
 
-    user_prompt = f"""아래 정보로 블로그 포스팅을 작성하고, 결과를 반드시 아래 JSON 형식으로만 응답해줘.
+        user_prompt = f"""아래 정보로 블로그 포스팅을 작성하고, 결과를 반드시 아래 JSON 형식으로만 응답해줘.
 다른 텍스트 없이 JSON만 출력해.
 
 [정보]
@@ -220,36 +221,39 @@ instagram: 인스타 감성으로 짧고 임팩트 있게.
 thumbnail: 블로그 대표 썸네일에 들어갈 짧은 핵심 문구.
 """
 
-    message = client.messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=max_tokens,
-        system=system_prompt,
-        messages=[{'role': 'user', 'content': user_prompt}]
-    )
+        message = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{'role': 'user', 'content': user_prompt}]
+        )
 
-    raw = message.content[0].text.strip()
-    if raw.startswith('```'):
-        raw = raw.split('\n', 1)[1]
-        raw = raw.rsplit('```', 1)[0].strip()
+        raw = message.content[0].text.strip()
+        if raw.startswith('```'):
+            raw = raw.split('\n', 1)[1]
+            raw = raw.rsplit('```', 1)[0].strip()
 
-    raw = sanitize_json(raw)
+        raw = sanitize_json(raw)
 
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
-        match = re.search(r'\{[\s\S]*\}', raw)
-        if match:
-            try:
-                result = json.loads(match.group())
-            except json.JSONDecodeError:
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            match = re.search(r'\{[\s\S]*\}', raw)
+            if match:
+                try:
+                    result = json.loads(match.group())
+                except json.JSONDecodeError:
+                    return jsonify({'error': '응답 파싱 실패', 'raw': raw[:500]}), 500
+            else:
                 return jsonify({'error': '응답 파싱 실패', 'raw': raw[:500]}), 500
-        else:
-            return jsonify({'error': '응답 파싱 실패', 'raw': raw[:500]}), 500
 
-    if 'titles' in result and not isinstance(result['titles'], list):
-        result['titles'] = [s.strip() for s in re.split(r'\n|\d+\.', str(result['titles'])) if s.strip()]
+        if 'titles' in result and not isinstance(result['titles'], list):
+            result['titles'] = [s.strip() for s in re.split(r'\n|\d+\.', str(result['titles'])) if s.strip()]
 
-    return jsonify(result)
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
