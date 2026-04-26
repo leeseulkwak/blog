@@ -1205,9 +1205,30 @@ async function generatePost(isRegen = false) {
   ['titleCard','hashtagCard','instaCard','thumbCard'].forEach(id => document.getElementById(id).style.display = 'none');
 
   try {
-    const res  = await fetch('/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error + (data.raw ? '\n' + data.raw : ''));
+    const res = await fetch('/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let data   = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const msg = JSON.parse(line.slice(6));
+          if (msg.error) throw new Error(msg.error);
+          if (msg.done)  { data = msg.result; }
+        } catch(e) { if (e.message !== 'SyntaxError') throw e; }
+      }
+    }
+    if (!data) throw new Error('응답을 받지 못했어요.');
 
     // 제목
     document.getElementById('titleCard').style.display = 'block';

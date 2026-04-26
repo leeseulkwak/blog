@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from anthropic import Anthropic
 from dotenv import load_dotenv
 import json, re, os
@@ -220,40 +220,55 @@ hashtags: {hashtag_tip}.
 instagram: 인스타 감성으로 짧고 임팩트 있게.
 thumbnail: 블로그 대표 썸네일에 들어갈 짧은 핵심 문구.
 """
-
-        message = client.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=[{'role': 'user', 'content': user_prompt}]
-        )
-
-        raw = message.content[0].text.strip()
-        if raw.startswith('```'):
-            raw = raw.split('\n', 1)[1]
-            raw = raw.rsplit('```', 1)[0].strip()
-
-        raw = sanitize_json(raw)
-
-        try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
-            match = re.search(r'\{[\s\S]*\}', raw)
-            if match:
-                try:
-                    result = json.loads(match.group())
-                except json.JSONDecodeError:
-                    return jsonify({'error': '응답 파싱 실패', 'raw': raw[:500]}), 500
-            else:
-                return jsonify({'error': '응답 파싱 실패', 'raw': raw[:500]}), 500
-
-        if 'titles' in result and not isinstance(result['titles'], list):
-            result['titles'] = [s.strip() for s in re.split(r'\n|\d+\.', str(result['titles'])) if s.strip()]
-
-        return jsonify(result)
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+    def stream():
+        try:
+            full_text = ''
+            with client.messages.stream(
+                model='claude-sonnet-4-6',
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=[{'role': 'user', 'content': user_prompt}]
+            ) as stream_obj:
+                for text in stream_obj.text_stream:
+                    full_text += text
+                    yield f'data: {json.dumps({"chunk": text})}\n\n'
+
+            raw = full_text.strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[1]
+                raw = raw.rsplit('```', 1)[0].strip()
+            raw = sanitize_json(raw)
+
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError:
+                match = re.search(r'\{[\s\S]*\}', raw)
+                if match:
+                    try:
+                        result = json.loads(match.group())
+                    except json.JSONDecodeError:
+                        yield f'data: {json.dumps({"error": "응답 파싱 실패"})}\n\n'
+                        return
+                else:
+                    yield f'data: {json.dumps({"error": "응답 파싱 실패"})}\n\n'
+                    return
+
+            if 'titles' in result and not isinstance(result['titles'], list):
+                result['titles'] = [s.strip() for s in re.split(r'\n|\d+\.', str(result['titles'])) if s.strip()]
+
+            yield f'data: {json.dumps({"done": True, "result": result})}\n\n'
+
+        except Exception as e:
+            yield f'data: {json.dumps({"error": str(e)})}\n\n'
+
+    return Response(
+        stream_with_context(stream()),
+        content_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
 
 
 if __name__ == '__main__':
