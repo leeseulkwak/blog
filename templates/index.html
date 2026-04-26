@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>맛집 블로그 자동 생성기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary:#4F7FFF; --primary-dark:#3B6EFF; --primary-light:#EBF0FF;
+      --blue:#6366F1; --blue-light:#EEF2FF;
+      --orange:#f59e0b; --orange-light:#fffbeb;
+      --red:#ef4444; --red-light:#fef2f2;
+      --bg:#F4F6FB; --card:#fff; --text:#1e2130; --text-sub:#6b7280;
+      --border:#e5e7eb; --radius:16px; --shadow:0 4px 20px rgba(79,127,255,0.10);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); }
+
+    /* ── 헤더 ── */
+    header { background:linear-gradient(135deg,#4F7FFF,#2D5BFF); color:white; padding:20px; text-align:center; }
+    header h1 { font-size:1.6rem; font-weight:700; }
+    header p { font-size:0.95rem; opacity:.85; margin-top:4px; }
+
+    /* ── 탭 ── */
+    .tab-nav { display:flex; background:white; border-bottom:2px solid var(--border); padding:0 20px; overflow-x:auto; }
+    .tab-btn {
+      padding:14px 20px; font-size:0.95rem; font-weight:600; font-family:inherit;
+      border:none; background:none; cursor:pointer; color:var(--text-sub);
+      border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all .15s;
+    }
+    .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .tab-btn:hover { color:var(--primary); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* ── 레이아웃 ── */
+    .page { max-width:1300px; margin:0 auto; padding:20px 16px 60px; }
+    .two-col { display:grid; grid-template-columns:440px 1fr; gap:16px; }
+    @media(max-width:960px){ .two-col { grid-template-columns:1fr; } }
+
+    /* ── 카드 ── */
+    .card { background:var(--card); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); margin-bottom:14px; }
+    .card-title { font-size:1.08rem; font-weight:800; color:var(--text-sub); text-transform:uppercase; letter-spacing:.5px; margin-bottom:14px; }
+
+    /* ── 폼 ── */
+    .form-group { margin-bottom:12px; }
+    .form-group label { display:block; font-size:0.95rem; font-weight:600; color:var(--text-sub); margin-bottom:5px; }
+    .form-group input,.form-group textarea,.form-group select {
+      width:100%; border:2px solid var(--border); border-radius:10px;
+      padding:10px 14px; font-size:1rem; font-family:inherit;
+      outline:none; color:var(--text); transition:border-color .2s; background:white;
+    }
+    .form-group input:focus,.form-group textarea:focus { border-color:var(--primary); }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    /* ── 블로그 타입 선택 ── */
+    .type-selector { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:18px; }
+    .type-btn {
+      padding:11px 4px; border-radius:12px; font-size:0.9rem; font-weight:600;
+      border:2px solid var(--border); background:var(--bg); cursor:pointer;
+      font-family:inherit; color:var(--text); transition:all .15s; text-align:center; line-height:1.4;
+    }
+    .type-btn.active { background:var(--primary); border-color:var(--primary); color:white; }
+    .type-btn:hover:not(.active) { border-color:var(--primary); color:var(--primary); }
+    .type-fields { display:none; }
+    .type-fields.active { display:block; }
+
+    /* ── 섹션 헤더 ── */
+    .section-header {
+      display:flex; align-items:center; gap:10px;
+      margin:18px 0 12px; padding-bottom:10px; border-bottom:2px solid var(--border);
+    }
+    .section-header:first-child { margin-top:0; }
+    .section-num {
+      width:28px; height:28px; border-radius:50%; background:var(--primary);
+      color:white; font-size:0.9rem; font-weight:800;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .section-title { font-size:1.05rem; font-weight:700; color:var(--text); }
+
+    /* ── 카테고리 ── */
+    .cat-btns { display:flex; flex-wrap:wrap; gap:6px; }
+    .cat-btn {
+      padding:7px 14px; border-radius:20px; font-size:0.95rem; font-weight:500;
+      border:2px solid var(--border); background:var(--bg); cursor:pointer;
+      font-family:inherit; color:var(--text); transition:all .15s;
+    }
+    .cat-btn.active { background:var(--primary); border-color:var(--primary); color:white; font-weight:700; }
+
+    /* ── 별점 ── */
+    .star-group { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .star-row { background:var(--bg); border-radius:10px; padding:10px 12px; }
+    .star-row label { font-size:0.85rem; font-weight:600; color:var(--text-sub); display:block; margin-bottom:5px; }
+    .stars { display:flex; gap:4px; }
+    .star { font-size:1.4rem; cursor:pointer; color:#d1d5db; transition:color .1s; user-select:none; }
+    .star.active { color:#f59e0b; }
+
+    /* ── 체크박스 그룹 ── */
+    .check-group { display:flex; gap:10px; flex-wrap:wrap; }
+    .check-item { display:flex; align-items:center; gap:6px; font-size:0.95rem; cursor:pointer; }
+    .check-item input { width:16px; height:16px; cursor:pointer; accent-color:var(--primary); }
+
+    /* ── 글 톤 ── */
+    .tone-btns { display:flex; gap:6px; flex-wrap:wrap; }
+    .tone-btn {
+      flex:1; padding:8px 10px; border-radius:20px; font-size:0.88rem; font-weight:500;
+      border:2px solid var(--border); background:var(--bg); cursor:pointer;
+      font-family:inherit; color:var(--text); transition:all .15s; text-align:center; white-space:nowrap;
+    }
+    .tone-btn.active { background:var(--blue); border-color:var(--blue); color:white; font-weight:700; }
+    .tone-btn:hover:not(.active) { border-color:var(--blue); color:var(--blue); }
+
+    /* ── 글 길이 ── */
+    .len-btns { display:flex; gap:8px; }
+    .len-btn {
+      flex:1; padding:10px; border-radius:8px; font-size:0.95rem; font-weight:500;
+      border:2px solid var(--border); background:var(--bg); cursor:pointer;
+      font-family:inherit; color:var(--text); transition:all .15s; text-align:center;
+    }
+    .len-btn.active { background:var(--primary); border-color:var(--primary); color:white; font-weight:700; }
+
+    /* ── 생성 버튼 ── */
+    .btn-generate {
+      width:100%; padding:14px; background:var(--primary); color:white;
+      border:none; border-radius:12px; font-size:1.05rem; font-weight:700;
+      font-family:inherit; cursor:pointer; transition:background .2s; margin-top:6px;
+    }
+    .btn-generate:hover { background:var(--primary-dark); }
+    .btn-generate:disabled { background:#9ca3af; cursor:not-allowed; }
+
+    /* ── SEO 체크리스트 ── */
+    .seo-list { display:flex; flex-direction:column; gap:8px; }
+    .seo-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px; background:var(--bg); }
+    .seo-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; background:#d1d5db; }
+    .seo-dot.good { background:#4F7FFF; }
+    .seo-dot.warn { background:#f59e0b; }
+    .seo-dot.bad  { background:#ef4444; }
+    .seo-text { font-size:1.1rem; font-weight:600; color:var(--text); flex:1; }
+    .seo-badge { font-size:0.92rem; font-weight:800; padding:3px 12px; border-radius:20px; }
+    .seo-badge.good { background:#EBF0FF; color:#4F7FFF; }
+    .seo-badge.warn { background:#fffbeb; color:#f59e0b; }
+    .seo-badge.bad  { background:#fef2f2; color:#ef4444; }
+
+    /* ── 결과 영역 ── */
+    .right-col { display:flex; flex-direction:column; gap:14px; }
+
+    .title-list { display:flex; flex-direction:column; gap:10px; margin-bottom:10px; }
+    .title-option {
+      display:flex; align-items:flex-start; gap:12px;
+      padding:16px 18px; border-radius:12px; border:2px solid var(--border);
+      cursor:pointer; font-size:1.32rem; font-weight:600; transition:all .15s; background:var(--bg); line-height:1.6;
+    }
+    .title-option:hover,.title-option.selected { border-color:var(--primary); background:var(--primary-light); }
+    .title-option.selected { font-weight:700; }
+    .title-num {
+      min-width:26px; height:26px; border-radius:50%; background:var(--border);
+      color:var(--text-sub); font-size:0.85rem; font-weight:700;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
+    }
+    .title-option.selected .title-num { background:var(--primary); color:white; }
+    .title-option:hover .title-num { background:var(--primary); color:white; }
+    .title-custom {
+      width:100%; border:2px solid var(--border); border-radius:10px;
+      padding:12px 14px; font-size:1.08rem; font-family:inherit; font-weight:600;
+      outline:none; color:var(--text); margin-top:6px; transition:border-color .2s;
+    }
+    .title-custom:focus { border-color:var(--primary); }
+
+    .hashtag-box {
+      background:var(--bg); border-radius:10px; padding:14px 16px;
+      font-size:1rem; color:var(--primary); font-weight:500; line-height:1.9;
+      border:2px solid var(--primary-light); cursor:pointer; transition:all .15s;
+    }
+    .hashtag-box:hover { background:var(--primary-light); }
+
+    .insta-box {
+      background:#fdf4ff; border:2px solid #e9d5ff; border-radius:10px;
+      padding:14px 16px; font-size:0.95rem; color:#7c3aed; line-height:1.8;
+      white-space:pre-line; cursor:pointer; transition:all .15s;
+    }
+    .insta-box:hover { background:#f3e8ff; }
+
+    .thumb-box {
+      background:linear-gradient(135deg,#1e2130,#374151); border-radius:12px;
+      padding:20px; text-align:center; cursor:pointer; transition:all .15s;
+    }
+    .thumb-box:hover { opacity:.9; }
+    .thumb-text { font-size:2.4rem; font-weight:800; color:white; letter-spacing:2px; }
+    .thumb-hint { font-size:0.92rem; color:rgba(255,255,255,.5); margin-top:8px; }
+
+    .post-preview {
+      width:100%; min-height:380px; border:2px solid var(--border); border-radius:10px;
+      padding:20px; font-size:1.18rem; font-weight:500; font-family:inherit; outline:none;
+      color:var(--text); resize:vertical; line-height:2.1; background:#fafafa;
+      transition:border-color .2s;
+    }
+    .post-preview:focus { border-color:var(--primary); background:white; }
+
+    /* 글자수 바 */
+    .char-bar-wrap { margin-top:8px; }
+    .char-bar-info { display:flex; justify-content:space-between; font-size:0.82rem; color:var(--text-sub); margin-bottom:4px; }
+    .char-bar-track { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+    .char-bar-fill { height:100%; border-radius:3px; transition:width .3s, background .3s; }
+
+    .result-btns { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .btn-action {
+      flex:1; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:600;
+      font-family:inherit; cursor:pointer; transition:all .15s; border:none; min-width:100px;
+    }
+    .btn-regen  { background:var(--blue-light); color:var(--blue); }
+    .btn-regen:hover  { background:var(--blue); color:white; }
+    .btn-copy   { background:var(--primary); color:white; }
+    .btn-copy:hover   { background:var(--primary-dark); }
+    .btn-naver  { background:#f8f9fa; color:var(--text); border:2px solid var(--border); text-decoration:none; display:flex; align-items:center; justify-content:center; gap:5px; }
+    .btn-naver:hover  { border-color:var(--primary); color:var(--primary); }
+
+    .tip { font-size:0.8rem; color:var(--text-sub); margin-top:6px; }
+
+    /* ── 초안 저장 ── */
+    .draft-bar { display:flex; align-items:center; justify-content:space-between; font-size:0.82rem; color:var(--text-sub); margin-top:4px; }
+    .draft-saved { color:var(--primary); font-weight:600; display:none; }
+
+    /* ── 블로그 URL 관리 ── */
+    .blog-url-form { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+    .blog-url-form input { flex:1; min-width:100px; border:2px solid var(--border); border-radius:8px; padding:8px 12px; font-size:0.9rem; font-family:inherit; outline:none; }
+    .blog-url-form input:focus { border-color:var(--primary); }
+    .btn-blog-add { padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:8px; font-size:0.9rem; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; }
+    .blogurl-item { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg); border-radius:10px; border:1.5px solid var(--border); margin-bottom:6px; }
+    .blogurl-info { flex:1; min-width:0; }
+    .blogurl-name { font-size:0.92rem; font-weight:600; }
+    .blogurl-url  { font-size:0.75rem; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* ── 블로그 열기 드롭다운 ── */
+    .blog-dropdown-wrap { position:relative; flex:1; min-width:100px; }
+    .blog-dropdown { position:absolute; bottom:110%; left:0; right:0; background:white; border:2px solid var(--border); border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.15); overflow:hidden; z-index:100; }
+    .blog-dd-item { display:block; padding:10px 14px; font-size:0.9rem; color:var(--text); text-decoration:none; transition:background .15s; }
+    .blog-dd-item:hover { background:var(--primary-light); color:var(--primary); }
+
+    /* ── 플레이스홀더 ── */
+    .placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:260px; color:var(--text-sub); gap:8px; }
+    .placeholder .p-icon { font-size:2.8rem; }
+    .placeholder p { font-size:0.9rem; }
+
+    /* ── 방문 기록 ── */
+    .history-list { display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; }
+    .history-item {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 14px; border-radius:10px; background:var(--bg);
+      border:1.5px solid var(--border); cursor:pointer; transition:all .15s; gap:8px;
+    }
+    .history-item:hover { border-color:var(--primary); background:var(--primary-light); }
+    .history-info { flex:1; min-width:0; }
+    .history-name { font-size:0.95rem; font-weight:600; }
+    .history-meta { font-size:0.8rem; color:var(--text-sub); margin-top:2px; }
+    .btn-del { background:none; border:none; color:#d1d5db; cursor:pointer; font-size:1rem; padding:2px 8px; border-radius:6px; transition:all .15s; }
+    .btn-del:hover { color:var(--red); background:var(--red-light); }
+    .empty-msg { font-size:0.9rem; color:var(--text-sub); text-align:center; padding:24px 0; }
+
+    /* ── 통계 ── */
+    .stat-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+    .stat-card { border-radius:14px; padding:18px; text-align:center; }
+    .stat-card .sc-icon { font-size:1.6rem; margin-bottom:6px; }
+    .stat-card .sc-label { font-size:0.8rem; color:var(--text-sub); font-weight:500; margin-bottom:4px; }
+    .stat-card .sc-value { font-size:1.4rem; font-weight:700; }
+    .sc-total { background:var(--primary-light); } .sc-total .sc-value { color:var(--primary); }
+    .sc-month { background:var(--blue-light); } .sc-month .sc-value { color:var(--blue); }
+    .sc-cat   { background:var(--orange-light); } .sc-cat .sc-value { color:var(--orange); }
+
+    .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px){ .charts-row { grid-template-columns:1fr; } }
+    .chart-wrap { background:white; border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); }
+    .chart-wrap h3 { font-size:0.9rem; color:var(--text-sub); margin-bottom:14px; font-weight:700; }
+
+    /* ── 위시리스트 ── */
+    .wish-form { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+    .wish-form input {
+      flex:1; min-width:160px; border:2px solid var(--border); border-radius:10px;
+      padding:10px 14px; font-size:1rem; font-family:inherit; outline:none;
+    }
+    .wish-form input:focus { border-color:var(--primary); }
+    .btn-wish-add {
+      padding:10px 20px; background:var(--primary); color:white; border:none;
+      border-radius:10px; font-size:0.95rem; font-weight:700; font-family:inherit; cursor:pointer;
+    }
+    .wish-list { display:flex; flex-direction:column; gap:8px; }
+    .wish-item {
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      background:var(--bg); border-radius:10px; border:1.5px solid var(--border);
+    }
+    .wish-check { width:18px; height:18px; cursor:pointer; accent-color:var(--primary); flex-shrink:0; }
+    .wish-info { flex:1; }
+    .wish-name { font-size:1rem; font-weight:600; }
+    .wish-meta { font-size:0.82rem; color:var(--text-sub); margin-top:2px; }
+    .wish-item.done .wish-name { text-decoration:line-through; color:var(--text-sub); }
+
+    /* ── 포스팅 캘린더 ── */
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .cal-nav button { width:34px; height:34px; border-radius:50%; border:none; background:var(--primary-light); color:var(--primary); font-size:1rem; cursor:pointer; font-weight:700; transition:all .15s; }
+    .cal-nav button:hover { background:var(--primary); color:white; }
+    .cal-nav h3 { font-size:1.1rem; font-weight:700; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+    .cal-header { text-align:center; font-size:0.8rem; font-weight:700; color:var(--text-sub); padding:4px 0 8px; }
+    .cal-header:first-child { color:var(--red); }
+    .cal-header:last-child  { color:var(--blue); }
+    .cal-cell {
+      min-height:64px; border-radius:10px; background:var(--bg); border:1.5px solid transparent;
+      padding:6px; cursor:pointer; transition:all .15s; display:flex; flex-direction:column; gap:3px;
+    }
+    .cal-cell:hover:not(.empty) { border-color:var(--primary); background:var(--primary-light); }
+    .cal-cell.empty { background:transparent; cursor:default; }
+    .cal-cell.today { border-color:var(--primary); background:var(--primary-light); }
+    .cal-cell.has-plan { background:#f0f4ff; border-color:#c7d2fe; }
+    .cal-day { font-size:0.85rem; font-weight:600; }
+    .cal-cell.sunday .cal-day  { color:var(--red); }
+    .cal-cell.saturday .cal-day { color:var(--blue); }
+    .cal-plan-dot { font-size:0.65rem; background:var(--blue); color:white; border-radius:4px; padding:1px 5px; font-weight:600; }
+    .cal-plan-text { font-size:0.6rem; color:var(--blue); font-weight:500; }
+
+    /* 캘린더 모달 */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:white; border-radius:20px; padding:24px; width:360px; max-width:95vw; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+    .modal h3 { font-size:1.05rem; font-weight:700; margin-bottom:14px; }
+    .modal input,.modal textarea {
+      width:100%; border:2px solid var(--border); border-radius:10px;
+      padding:10px 14px; font-size:0.95rem; font-family:inherit; outline:none;
+      margin-bottom:10px; transition:border-color .2s;
+    }
+    .modal input:focus,.modal textarea:focus { border-color:var(--primary); }
+    .modal-btns { display:flex; gap:8px; }
+    .btn-modal-cancel { flex:1; padding:11px; border:2px solid var(--border); border-radius:10px; background:white; cursor:pointer; font-family:inherit; font-size:0.95rem; color:var(--text-sub); }
+    .btn-modal-save   { flex:2; padding:11px; border:none; border-radius:10px; background:var(--primary); color:white; cursor:pointer; font-family:inherit; font-size:0.95rem; font-weight:700; }
+    .btn-modal-del    { flex:1; padding:11px; border:2px solid #fca5a5; border-radius:10px; background:var(--red-light); color:var(--red); cursor:pointer; font-family:inherit; font-size:0.95rem; }
+
+    /* ── 가이드 팝업 ── */
+    .guide-btn {
+      position:fixed; bottom:24px; right:24px; z-index:300;
+      width:52px; height:52px; border-radius:50%;
+      background:var(--primary); color:white;
+      border:none; font-size:1.4rem; font-weight:700;
+      cursor:pointer; box-shadow:0 4px 16px rgba(79,127,255,.4);
+      transition:all .2s; display:flex; align-items:center; justify-content:center;
+    }
+    .guide-btn:hover { background:var(--primary-dark); transform:scale(1.1); box-shadow:0 6px 24px rgba(79,127,255,.5); }
+
+    .guide-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:400; align-items:center; justify-content:center; padding:16px; }
+    .guide-overlay.open { display:flex; }
+
+    .guide-modal {
+      background:white; border-radius:20px; width:100%; max-width:620px;
+      max-height:90vh; overflow-y:auto; box-shadow:0 16px 48px rgba(0,0,0,.25);
+    }
+    .guide-header {
+      background:linear-gradient(135deg,#4F7FFF,#2D5BFF); color:white;
+      padding:22px 24px 18px; border-radius:20px 20px 0 0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .guide-header h2 { font-size:1.15rem; font-weight:700; }
+    .guide-header p { font-size:0.85rem; opacity:.85; margin-top:3px; }
+    .guide-close { background:rgba(255,255,255,.2); border:none; color:white; width:32px; height:32px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .15s; }
+    .guide-close:hover { background:rgba(255,255,255,.35); }
+
+    .guide-body { padding:20px 24px 24px; }
+
+    .guide-steps { display:flex; flex-direction:column; gap:14px; }
+    .guide-step {
+      display:flex; gap:14px; padding:16px; background:var(--bg);
+      border-radius:14px; border:1.5px solid var(--border);
+    }
+    .guide-step-num {
+      width:32px; height:32px; border-radius:50%; background:var(--primary);
+      color:white; font-size:0.95rem; font-weight:800;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .guide-step-body h4 { font-size:0.98rem; font-weight:700; color:var(--text); margin-bottom:5px; }
+    .guide-step-body p  { font-size:0.88rem; color:var(--text-sub); line-height:1.7; }
+    .guide-step-body ul { margin:5px 0 0 16px; }
+    .guide-step-body ul li { font-size:0.87rem; color:var(--text-sub); line-height:1.7; }
+
+    .guide-tip {
+      margin-top:16px; background:#fffbeb; border:1.5px solid #fde68a;
+      border-radius:12px; padding:14px 16px; font-size:0.88rem; color:#92400e; line-height:1.7;
+    }
+    .guide-tip strong { color:#b45309; }
+
+    .guide-tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .guide-tab { padding:7px 16px; border-radius:20px; font-size:0.88rem; font-weight:600; border:2px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; color:var(--text-sub); transition:all .15s; }
+    .guide-tab.active { background:var(--primary); border-color:var(--primary); color:white; }
+    .guide-section { display:none; }
+    .guide-section.active { display:block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🍽️ 맛집 블로그 자동 생성기</h1>
+  <p id="headerDate"></p>
+</header>
+
+<!-- 가이드 플로팅 버튼 -->
+<button class="guide-btn" onclick="openGuide()" title="사용 가이드">?</button>
+
+<!-- 가이드 팝업 -->
+<div class="guide-overlay" id="guideOverlay" onclick="if(event.target===this)closeGuide()">
+  <div class="guide-modal">
+    <div class="guide-header">
+      <div>
+        <h2>📖 사용 가이드</h2>
+        <p>블로그 자동 생성기 사용법을 확인해보세요!</p>
+      </div>
+      <button class="guide-close" onclick="closeGuide()">✕</button>
+    </div>
+    <div class="guide-body">
+
+      <!-- 탭 -->
+      <div class="guide-tabs">
+        <button class="guide-tab active" data-guide="basic" onclick="switchGuideTab(this)">📝 기본 사용법</button>
+        <button class="guide-tab" data-guide="types" onclick="switchGuideTab(this)">📂 글 타입</button>
+        <button class="guide-tab" data-guide="features" onclick="switchGuideTab(this)">⚙️ 부가 기능</button>
+      </div>
+
+      <!-- 기본 사용법 -->
+      <div class="guide-section active" id="guide-basic">
+        <div class="guide-steps">
+          <div class="guide-step">
+            <div class="guide-step-num">1</div>
+            <div class="guide-step-body">
+              <h4>글 타입 선택</h4>
+              <p>맛집 · 아이템 · 여행 · 후기 중 원하는 블로그 유형을 선택하세요. 타입에 따라 입력 항목이 바뀝니다.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">2</div>
+            <div class="guide-step-body">
+              <h4>정보 입력</h4>
+              <p>가게명·메뉴·주소 등 필수 항목을 채우세요. 별점과 카테고리도 선택하면 더 풍부한 글이 만들어져요.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">3</div>
+            <div class="guide-step-body">
+              <h4>글 옵션 설정</h4>
+              <p>사진 수 · 글 길이 · 글 톤을 설정하세요.</p>
+              <ul>
+                <li><strong>글 톤</strong> — 친근한 / 감성적인 / 전문가 / 유머러스</li>
+                <li><strong>글 길이</strong> — 짧게 / 보통 / 길게</li>
+                <li><strong>사진 수</strong> — 본문에 [사진1][사진2] 자리 표시</li>
+              </ul>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">4</div>
+            <div class="guide-step-body">
+              <h4>생성 &amp; 복사</h4>
+              <p>✨ 블로그 글 생성 버튼을 누르면 본문 · 제목 3개 · 해시태그 · 인스타 캡션 · 썸네일 문구가 한 번에 만들어집니다. 원하는 제목을 클릭하고 <strong>본문 복사</strong>로 바로 붙여넣기 하세요!</p>
+            </div>
+          </div>
+        </div>
+        <div class="guide-tip">
+          💡 <strong>초안 저장</strong> 기능으로 입력 내용을 임시 보관할 수 있어요. 페이지를 새로고침해도 유지됩니다!
+        </div>
+      </div>
+
+      <!-- 글 타입 -->
+      <div class="guide-section" id="guide-types">
+        <div class="guide-steps">
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#f59e0b">🍽</div>
+            <div class="guide-step-body">
+              <h4>맛집 리뷰</h4>
+              <p>가게명 · 주소 · 메뉴 · 가격 · 분위기 등을 입력하면 네이버 맛집 블로그 스타일의 글이 생성됩니다. 주차/웨이팅/예약 가능 여부도 반영돼요.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#6366F1">📦</div>
+            <div class="guide-step-body">
+              <h4>아이템 리뷰</h4>
+              <p>제품명 · 브랜드 · 구매처 · 가격 · 사용 기간 · 장단점을 입력하세요. 언박싱부터 실사용 후기까지 구성됩니다.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#10b981">✈️</div>
+            <div class="guide-step-body">
+              <h4>여행기</h4>
+              <p>여행지 · 기간 · 교통 · 숙소 · 방문지 · 총비용을 입력하면 여행 설렘이 느껴지는 여행기가 만들어져요.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#ec4899">✏️</div>
+            <div class="guide-step-body">
+              <h4>일반 후기</h4>
+              <p>공연 · 전시 · 영화 · 도서 · 강의 등 다양한 경험의 후기를 작성할 수 있어요. 날짜 · 비용 · 인상깊은 점을 입력하세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 부가 기능 -->
+      <div class="guide-section" id="guide-features">
+        <div class="guide-steps">
+          <div class="guide-step">
+            <div class="guide-step-num">📊</div>
+            <div class="guide-step-body">
+              <h4>통계 탭</h4>
+              <p>생성한 글의 총 수 · 이번 달 수 · 가장 많이 쓴 카테고리를 확인하고, 카테고리별 / 월별 차트를 볼 수 있어요.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">🗺</div>
+            <div class="guide-step-body">
+              <h4>위시리스트 탭</h4>
+              <p>가보고 싶은 맛집·장소를 위시리스트에 저장하고 체크해가며 관리하세요. 체크 완료된 항목은 취소선으로 표시돼요.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">📅</div>
+            <div class="guide-step-body">
+              <h4>포스팅 캘린더</h4>
+              <p>달력에서 날짜를 클릭해 포스팅 계획을 등록하세요. 계획된 날짜는 파란 점으로 표시됩니다.</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num">🔗</div>
+            <div class="guide-step-body">
+              <h4>블로그 바로가기</h4>
+              <p>글 생성 탭 하단의 <strong>블로그 열기</strong> 버튼으로 내 네이버 블로그를 바로 열 수 있어요. 설정에서 블로그 URL을 추가·관리할 수 있습니다.</p>
+            </div>
+          </div>
+        </div>
+        <div class="guide-tip">
+          💡 생성된 글의 <strong>방문 기록</strong>은 자동으로 저장됩니다. 이전에 만든 글을 다시 불러와 수정할 수 있어요!
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 탭 네비게이션 -->
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="generate">✍️ 글 생성</button>
+  <button class="tab-btn" data-tab="stats">📊 통계</button>
+  <button class="tab-btn" data-tab="wishlist">🗺️ 위시리스트</button>
+  <button class="tab-btn" data-tab="calendar">📅 포스팅 캘린더</button>
+</nav>
+
+<!-- ════════════════ TAB 1: 글 생성 ════════════════ -->
+<div class="tab-content active" id="tab-generate">
+  <div class="page">
+    <div class="two-col">
+
+      <!-- 왼쪽: 입력 폼 -->
+      <div>
+        <div class="card">
+
+          <!-- 블로그 타입 선택 -->
+          <div class="type-selector">
+            <button class="type-btn active" data-type="restaurant">🍽️<br>맛집</button>
+            <button class="type-btn" data-type="item">📦<br>아이템</button>
+            <button class="type-btn" data-type="travel">✈️<br>여행</button>
+            <button class="type-btn" data-type="review">✏️<br>후기</button>
+          </div>
+
+          <!-- ══════ 맛집 필드 ══════ -->
+          <div class="type-fields active" data-for="restaurant">
+            <div class="section-header"><div class="section-num">1</div><div class="section-title">카테고리 선택</div></div>
+            <div class="form-group">
+              <div class="cat-btns" data-group="restaurant">
+                <button class="cat-btn" data-value="한식">🍚 한식</button>
+                <button class="cat-btn" data-value="중식">🥢 중식</button>
+                <button class="cat-btn" data-value="일식">🍣 일식</button>
+                <button class="cat-btn" data-value="양식">🍝 양식</button>
+                <button class="cat-btn" data-value="해산물">🦐 해산물</button>
+                <button class="cat-btn" data-value="카페/디저트">☕ 카페</button>
+                <button class="cat-btn" data-value="치킨/피자">🍕 치킨/피자</button>
+                <button class="cat-btn" data-value="기타">🍴 기타</button>
+              </div>
+            </div>
+            <div class="section-header"><div class="section-num">2</div><div class="section-title">맛집 기본 정보</div></div>
+            <div class="form-group"><label>🏪 가게명 *</label><input type="text" id="restaurant" placeholder="예: 회뜰날" /></div>
+            <div class="form-group"><label>📍 주소 *</label><input type="text" id="address" placeholder="예: 경기도 수원시 팔달구 중부대로 193" /></div>
+            <div class="form-row">
+              <div class="form-group"><label>🕐 영업시간</label><input type="text" id="hours" placeholder="예: 14~24시 (월 휴무)" /></div>
+              <div class="form-group"><label>🚶 거리/이동</label><input type="text" id="distance" placeholder="예: 걸어서 20분" /></div>
+            </div>
+            <div class="form-group"><label>🍱 주문 메뉴 *</label><input type="text" id="menus" placeholder="예: 2인상 (회+물회+해산물+스끼다시)" /></div>
+            <div class="form-row">
+              <div class="form-group"><label>💰 가격</label><input type="text" id="price" placeholder="예: 65,000원" /></div>
+              <div class="form-group"><label>👥 동행</label><input type="text" id="companion" placeholder="예: 친구 2명" /></div>
+            </div>
+            <div class="form-group"><label>✨ 분위기</label><input type="text" id="atmosphere" placeholder="예: 실내+야장, 깔끔한 횟집 분위기" /></div>
+            <div class="section-header"><div class="section-num">3</div><div class="section-title">편의시설 & 별점</div></div>
+            <div class="form-group">
+              <label>🏢 편의시설</label>
+              <div class="check-group">
+                <label class="check-item"><input type="checkbox" id="chkParking" /> 🚗 주차 가능</label>
+                <label class="check-item"><input type="checkbox" id="chkWaiting" /> ⏳ 웨이팅 있음</label>
+                <label class="check-item"><input type="checkbox" id="chkReservation" /> 📞 예약 가능</label>
+              </div>
+            </div>
+            <div class="form-group"><label>⭐ 별점</label>
+              <div class="star-group">
+                <div class="star-row"><label>🍽️ 맛</label><div class="stars" data-key="taste"></div></div>
+                <div class="star-row"><label>😊 서비스</label><div class="stars" data-key="service"></div></div>
+                <div class="star-row"><label>💰 가격</label><div class="stars" data-key="price"></div></div>
+                <div class="star-row"><label>🏠 분위기</label><div class="stars" data-key="mood"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ 아이템 필드 ══════ -->
+          <div class="type-fields" data-for="item">
+            <div class="section-header"><div class="section-num">1</div><div class="section-title">카테고리 선택</div></div>
+            <div class="form-group">
+              <div class="cat-btns" data-group="item">
+                <button class="cat-btn" data-value="전자기기">💻 전자기기</button>
+                <button class="cat-btn" data-value="뷰티/화장품">💄 뷰티</button>
+                <button class="cat-btn" data-value="패션/의류">👗 패션</button>
+                <button class="cat-btn" data-value="생활용품">🏠 생활용품</button>
+                <button class="cat-btn" data-value="식품/건강">🥗 식품/건강</button>
+                <button class="cat-btn" data-value="도서/음반">📚 도서/음반</button>
+                <button class="cat-btn" data-value="기타">🛍️ 기타</button>
+              </div>
+            </div>
+            <div class="section-header"><div class="section-num">2</div><div class="section-title">제품 기본 정보</div></div>
+            <div class="form-group"><label>📦 제품명 *</label><input type="text" id="itemName" placeholder="예: 다이슨 에어랩 컴플리트" /></div>
+            <div class="form-row">
+              <div class="form-group"><label>🏷️ 브랜드</label><input type="text" id="itemBrand" placeholder="예: 다이슨" /></div>
+              <div class="form-group"><label>🛒 구매처</label><input type="text" id="itemPurchase" placeholder="예: 쿠팡, 올리브영" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>💰 가격</label><input type="text" id="itemPrice" placeholder="예: 598,000원" /></div>
+              <div class="form-group"><label>📅 사용 기간</label><input type="text" id="itemUsePeriod" placeholder="예: 3개월" /></div>
+            </div>
+            <div class="section-header"><div class="section-num">3</div><div class="section-title">사용 후기 & 별점</div></div>
+            <div class="form-group"><label>👍 장점</label><textarea id="itemPros" rows="2" placeholder="좋았던 점, 만족스러운 기능 등"></textarea></div>
+            <div class="form-group"><label>👎 단점</label><textarea id="itemCons" rows="2" placeholder="아쉬운 점, 불편한 점 등"></textarea></div>
+            <div class="form-group"><label>⭐ 별점</label>
+              <div class="star-group">
+                <div class="star-row"><label>✨ 품질</label><div class="stars" data-key="quality"></div></div>
+                <div class="star-row"><label>💰 가성비</label><div class="stars" data-key="costperf"></div></div>
+                <div class="star-row"><label>🎨 디자인</label><div class="stars" data-key="design"></div></div>
+                <div class="star-row"><label>🖐️ 편의성</label><div class="stars" data-key="usability"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ 여행 필드 ══════ -->
+          <div class="type-fields" data-for="travel">
+            <div class="section-header"><div class="section-num">1</div><div class="section-title">여행 종류</div></div>
+            <div class="form-group">
+              <div class="cat-btns" data-group="travel">
+                <button class="cat-btn" data-value="국내여행">🇰🇷 국내</button>
+                <button class="cat-btn" data-value="해외여행">🌏 해외</button>
+                <button class="cat-btn" data-value="당일치기">🚗 당일치기</button>
+                <button class="cat-btn" data-value="캠핑/글램핑">⛺ 캠핑</button>
+                <button class="cat-btn" data-value="테마파크">🎢 테마파크</button>
+                <button class="cat-btn" data-value="기타">✈️ 기타</button>
+              </div>
+            </div>
+            <div class="section-header"><div class="section-num">2</div><div class="section-title">여행 기본 정보</div></div>
+            <div class="form-group"><label>📍 여행지 *</label><input type="text" id="travelDest" placeholder="예: 제주도, 오사카" /></div>
+            <div class="form-row">
+              <div class="form-group"><label>📅 여행 기간</label><input type="text" id="travelPeriod" placeholder="예: 2박3일, 4월 20~22일" /></div>
+              <div class="form-group"><label>👥 동행</label><input type="text" id="travelCompanion" placeholder="예: 친구 3명" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>🚌 교통편</label><input type="text" id="travelTransport" placeholder="예: 제주항공, 렌트카" /></div>
+              <div class="form-group"><label>🏨 숙소</label><input type="text" id="travelLodging" placeholder="예: 제주 롯데시티 호텔" /></div>
+            </div>
+            <div class="form-group"><label>🗺️ 주요 방문지/일정</label><textarea id="travelSpots" rows="3" placeholder="예: 1일차 - 성산일출봉, 우도&#10;2일차 - 한림공원, 카멜리아힐"></textarea></div>
+            <div class="form-group"><label>💸 총 비용</label><input type="text" id="travelCost" placeholder="예: 1인 35만원 (항공+숙박+식비)" /></div>
+            <div class="section-header"><div class="section-num">3</div><div class="section-title">여행 별점</div></div>
+            <div class="form-group"><label>⭐ 별점</label>
+              <div class="star-group">
+                <div class="star-row"><label>🏔️ 경치</label><div class="stars" data-key="scenery"></div></div>
+                <div class="star-row"><label>🍜 음식</label><div class="stars" data-key="tfood"></div></div>
+                <div class="star-row"><label>🏨 숙소</label><div class="stars" data-key="tlodging"></div></div>
+                <div class="star-row"><label>🚇 접근성</label><div class="stars" data-key="access"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════ 후기 필드 ══════ -->
+          <div class="type-fields" data-for="review">
+            <div class="section-header"><div class="section-num">1</div><div class="section-title">후기 종류</div></div>
+            <div class="form-group">
+              <div class="cat-btns" data-group="review">
+                <button class="cat-btn" data-value="공연/전시">🎭 공연/전시</button>
+                <button class="cat-btn" data-value="영화/드라마">🎬 영화/드라마</button>
+                <button class="cat-btn" data-value="도서">📖 도서</button>
+                <button class="cat-btn" data-value="강의/교육">🎓 강의/교육</button>
+                <button class="cat-btn" data-value="팝업스토어">🏪 팝업스토어</button>
+                <button class="cat-btn" data-value="기타">✏️ 기타</button>
+              </div>
+            </div>
+            <div class="section-header"><div class="section-num">2</div><div class="section-title">기본 정보</div></div>
+            <div class="form-group"><label>📌 대상/제목 *</label><input type="text" id="reviewSubject" placeholder="예: 뮤지컬 레미제라블, 영화 인사이드아웃2" /></div>
+            <div class="form-row">
+              <div class="form-group"><label>📍 장소/플랫폼</label><input type="text" id="reviewVenue" placeholder="예: 블루스퀘어, 넷플릭스" /></div>
+              <div class="form-group"><label>📅 날짜</label><input type="text" id="reviewDate" placeholder="예: 2026.04.20" /></div>
+            </div>
+            <div class="form-group"><label>💰 비용</label><input type="text" id="reviewCost" placeholder="예: R석 15만원, 무료" /></div>
+            <div class="section-header"><div class="section-num">3</div><div class="section-title">후기 & 별점</div></div>
+            <div class="form-group"><label>📝 주요 내용/줄거리</label><textarea id="reviewContent" rows="2" placeholder="간단한 내용 또는 줄거리 요약"></textarea></div>
+            <div class="form-group"><label>💡 인상깊은 점</label><textarea id="reviewImpression" rows="2" placeholder="가장 기억에 남는 장면, 특별히 좋았던 점 등"></textarea></div>
+            <div class="form-group"><label>⭐ 별점</label>
+              <div class="star-group">
+                <div class="star-row"><label>😊 만족도</label><div class="stars" data-key="satisfaction"></div></div>
+                <div class="star-row"><label>👍 추천도</label><div class="stars" data-key="recommend"></div></div>
+                <div class="star-row"><label>🏆 완성도</label><div class="stars" data-key="complete"></div></div>
+                <div class="star-row"><label>💰 가성비</label><div class="stars" data-key="worth"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④ 추가 메모 (공통) -->
+          <div class="section-header"><div class="section-num">4</div><div class="section-title">추가 메모</div></div>
+          <div class="form-group">
+            <textarea id="extra" rows="2" placeholder="특이사항, 추천 포인트, 재방문 의사 등"></textarea>
+          </div>
+
+          <!-- ⑤ 글 설정 (공통) -->
+          <div class="section-header"><div class="section-num">5</div><div class="section-title">글 설정</div></div>
+          <div class="form-group">
+            <label>🎨 글의 톤</label>
+            <div class="tone-btns" id="toneBtns">
+              <button class="tone-btn active" data-value="friendly">😊 친근한</button>
+              <button class="tone-btn" data-value="emotional">💕 감성적인</button>
+              <button class="tone-btn" data-value="pro">🔍 전문가</button>
+              <button class="tone-btn" data-value="funny">😄 유머러스</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>📸 사진 개수</label>
+              <select id="photoCount">
+                <option value="3">3장</option>
+                <option value="5" selected>5장</option>
+                <option value="8">8장</option>
+                <option value="10">10장</option>
+                <option value="15">15장</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>📏 글 길이</label>
+              <div class="len-btns">
+                <button class="len-btn" data-value="short">짧게</button>
+                <button class="len-btn active" data-value="medium">보통</button>
+                <button class="len-btn" data-value="long">길게</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn-generate" id="btnGenerate" onclick="generatePost()" style="margin-top:0;">✍️ 블로그 글 자동 생성</button>
+            <button onclick="resetForm()" style="padding:14px 16px;border:2px solid var(--border);border-radius:12px;background:white;color:var(--text-sub);font-size:0.9rem;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .15s;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-sub)'">🗑️ 초기화</button>
+          </div>
+        </div>
+
+        <!-- 방문 기록 -->
+        <div class="card">
+          <div class="card-title">📚 방문 기록</div>
+          <div class="history-list" id="historyList"></div>
+        </div>
+
+        <!-- 내 블로그 목록 -->
+        <div class="card">
+          <div class="card-title">🔗 내 블로그 목록</div>
+          <div class="blog-url-form">
+            <input type="text" id="blogUrlName" placeholder="이름 (예: 메인블로그)" style="max-width:130px;" />
+            <input type="text" id="blogUrlInput" placeholder="블로그 글쓰기 URL" />
+            <button class="btn-blog-add" onclick="addBlogUrl()">+ 추가</button>
+          </div>
+          <div id="blogUrlList"></div>
+        </div>
+      </div>
+
+      <!-- 오른쪽: 결과 -->
+      <div class="right-col">
+
+        <!-- SEO 체크리스트 -->
+        <div class="card" id="seoCard">
+          <div class="card-title">🔍 SEO 체크리스트</div>
+          <div class="seo-list" id="seoList">
+            <div class="seo-item"><div class="seo-dot"></div><div class="seo-text">글자수</div><span class="seo-badge">-</span></div>
+            <div class="seo-item"><div class="seo-dot"></div><div class="seo-text">사진 개수 ([사진] 태그)</div><span class="seo-badge">-</span></div>
+            <div class="seo-item"><div class="seo-dot"></div><div class="seo-text">해시태그 (키워드)</div><span class="seo-badge">-</span></div>
+            <div class="seo-item"><div class="seo-dot"></div><div class="seo-text">별점 포함 여부</div><span class="seo-badge">-</span></div>
+            <div class="seo-item"><div class="seo-dot"></div><div class="seo-text">주소/위치 정보</div><span class="seo-badge">-</span></div>
+          </div>
+        </div>
+
+        <!-- 제목 추천 -->
+        <div class="card" id="titleCard" style="display:none;">
+          <div class="card-title">💡 제목 추천 (클릭해서 선택)</div>
+          <div class="title-list" id="titleList"></div>
+          <input class="title-custom" id="postTitle" placeholder="직접 입력 또는 위에서 선택" />
+        </div>
+
+        <!-- 해시태그 -->
+        <div class="card" id="hashtagCard" style="display:none;">
+          <div class="card-title">🏷️ 해시태그 (클릭하면 복사)</div>
+          <div class="hashtag-box" id="hashtagBox" onclick="copyText('hashtagBox', this)"></div>
+        </div>
+
+        <!-- 인스타 캡션 -->
+        <div class="card" id="instaCard" style="display:none;">
+          <div class="card-title">📸 인스타그램 캡션 (클릭하면 복사)</div>
+          <div class="insta-box" id="instaBox" onclick="copyText('instaBox', this)"></div>
+        </div>
+
+        <!-- 썸네일 문구 -->
+        <div class="card" id="thumbCard" style="display:none;">
+          <div class="card-title">🖼️ 썸네일 문구 (클릭하면 복사)</div>
+          <div class="thumb-box" onclick="copyText('thumbText', this)">
+            <div class="thumb-text" id="thumbText"></div>
+            <div class="thumb-hint">클릭하면 복사됩니다</div>
+          </div>
+        </div>
+
+        <!-- 본문 -->
+        <div class="card">
+          <div class="card-title">📄 블로그 본문</div>
+          <div id="resultArea">
+            <div class="placeholder">
+              <div class="p-icon">✍️</div>
+              <p>왼쪽에 맛집 정보를 입력하고</p>
+              <p><strong>글 자동 생성</strong> 버튼을 눌러주세요</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ TAB 2: 통계 ════════════════ -->
+<div class="tab-content" id="tab-stats">
+  <div class="page">
+    <div class="stat-cards" id="statCards"></div>
+    <div class="charts-row">
+      <div class="chart-wrap">
+        <h3>📅 월별 포스팅 수</h3>
+        <canvas id="chartMonthly" height="200"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <h3>🍜 카테고리 비율</h3>
+        <canvas id="chartCategory" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ TAB 3: 위시리스트 ════════════════ -->
+<div class="tab-content" id="tab-wishlist">
+  <div class="page" style="max-width:700px;">
+    <div class="card">
+      <div class="card-title">🗺️ 가고 싶은 맛집</div>
+      <div class="wish-form">
+        <input type="text" id="wishName" placeholder="가게명" />
+        <input type="text" id="wishCategory" placeholder="카테고리 (예: 한식)" style="max-width:140px;" />
+        <input type="text" id="wishMemo" placeholder="메모" />
+        <button class="btn-wish-add" onclick="addWish()">+ 추가</button>
+      </div>
+      <div class="wish-list" id="wishList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ TAB 4: 포스팅 캘린더 ════════════════ -->
+<div class="tab-content" id="tab-calendar">
+  <div class="page" style="max-width:780px;">
+    <div class="card">
+      <div class="cal-nav">
+        <button onclick="moveCalMonth(-1)">←</button>
+        <h3 id="calTitle"></h3>
+        <button onclick="moveCalMonth(1)">→</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 캘린더 모달 -->
+<div class="modal-overlay" id="calModal">
+  <div class="modal">
+    <h3 id="calModalTitle"></h3>
+    <input type="text" id="calPlanName" placeholder="맛집 이름 또는 메모" />
+    <textarea id="calPlanNote" rows="2" placeholder="추가 메모 (선택)"></textarea>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeCalModal()">취소</button>
+      <button class="btn-modal-del" id="calBtnDel" onclick="deletePlan()" style="display:none;">삭제</button>
+      <button class="btn-modal-save" onclick="savePlan()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// 탭
+// ═══════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'stats') renderStats();
+  });
+});
+
+// 헤더 날짜
+document.getElementById('headerDate').textContent =
+  new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+// ═══════════════════════════════════════
+// 상태
+// ═══════════════════════════════════════
+let selectedBlogType = 'restaurant';
+let selectedCategory = '';
+let selectedLength   = 'medium';
+let selectedTone     = 'friendly';
+let stars = {
+  taste:0, service:0, price:0, mood:0,           // 맛집
+  quality:0, costperf:0, design:0, usability:0,  // 아이템
+  scenery:0, tfood:0, tlodging:0, access:0,      // 여행
+  satisfaction:0, recommend:0, complete:0, worth:0 // 후기
+};
+let lastPayload = null;
+let autosaveTimer = null;
+
+// ═══════════════════════════════════════
+// 블로그 타입 전환
+// ═══════════════════════════════════════
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedBlogType = btn.dataset.type;
+    document.querySelectorAll('.type-fields').forEach(f => {
+      f.classList.toggle('active', f.dataset.for === selectedBlogType);
+    });
+    selectedCategory = '';
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    autosave();
+  });
+});
+
+// ═══════════════════════════════════════
+// 카테고리 (모든 그룹 공통 처리)
+// ═══════════════════════════════════════
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.closest('[data-group]')?.dataset.group;
+    document.querySelectorAll(`[data-group="${group}"] .cat-btn`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCategory = btn.dataset.value;
+    autosave();
+  });
+});
+
+// ═══════════════════════════════════════
+// 별점
+// ═══════════════════════════════════════
+document.querySelectorAll('.stars').forEach(container => {
+  const key = container.dataset.key;
+  for (let i = 1; i <= 5; i++) {
+    const s = document.createElement('span');
+    s.className = 'star'; s.textContent = '★'; s.dataset.val = i;
+    s.addEventListener('click', () => {
+      stars[key] = parseInt(s.dataset.val);
+      updateStars(container, stars[key]);
+      autosave();
+    });
+    s.addEventListener('mouseover', () => updateStars(container, i));
+    s.addEventListener('mouseout',  () => updateStars(container, stars[key]));
+    container.appendChild(s);
+  }
+  updateStars(container, 0);
+});
+
+function updateStars(container, val) {
+  container.querySelectorAll('.star').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.val) <= val);
+  });
+}
+
+// ═══════════════════════════════════════
+// 글 길이
+// ═══════════════════════════════════════
+document.querySelectorAll('.len-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.len-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedLength = btn.dataset.value;
+    autosave();
+  });
+});
+
+// ═══════════════════════════════════════
+// 글 톤
+// ═══════════════════════════════════════
+document.querySelectorAll('.tone-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedTone = btn.dataset.value;
+    autosave();
+  });
+});
+
+// ═══════════════════════════════════════
+// 폼 초기화
+// ═══════════════════════════════════════
+function resetForm() {
+  if (!confirm('입력된 내용을 모두 초기화할까요?')) return;
+  ['restaurant','address','hours','menus','price','companion','distance','atmosphere',
+   'itemName','itemBrand','itemPurchase','itemPrice','itemUsePeriod','itemPros','itemCons',
+   'travelDest','travelPeriod','travelTransport','travelLodging','travelCompanion','travelSpots','travelCost',
+   'reviewSubject','reviewVenue','reviewDate','reviewCost','reviewContent','reviewImpression','extra'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  selectedBlogType = 'restaurant';
+  selectedCategory = '';
+  selectedLength   = 'medium';
+  selectedTone     = 'friendly';
+  stars = { taste:0, service:0, price:0, mood:0, quality:0, costperf:0, design:0, usability:0,
+            scenery:0, tfood:0, tlodging:0, access:0, satisfaction:0, recommend:0, complete:0, worth:0 };
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'restaurant'));
+  document.querySelectorAll('.type-fields').forEach(f => f.classList.toggle('active', f.dataset.for === 'restaurant'));
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.len-btn').forEach(b => b.classList.toggle('active', b.dataset.value === 'medium'));
+  document.querySelectorAll('.tone-btn').forEach(b => b.classList.toggle('active', b.dataset.value === 'friendly'));
+  document.querySelectorAll('.stars').forEach(c => updateStars(c, 0));
+  document.getElementById('chkParking').checked = false;
+  document.getElementById('chkWaiting').checked = false;
+  document.getElementById('chkReservation').checked = false;
+  document.getElementById('photoCount').value = '5';
+  localStorage.removeItem('blog_draft');
+  // 결과 영역도 초기화
+  document.getElementById('resultArea').innerHTML = `<div class="placeholder"><div class="p-icon">✍️</div><p>왼쪽에 맛집 정보를 입력하고</p><p><strong>글 자동 생성</strong> 버튼을 눌러주세요</p></div>`;
+  ['titleCard','hashtagCard','instaCard','thumbCard'].forEach(id => document.getElementById(id).style.display = 'none');
+  lastPayload = null;
+}
+
+// ═══════════════════════════════════════
+// 초안 자동저장
+// ═══════════════════════════════════════
+['restaurant','address','hours','menus','price','companion','distance','atmosphere',
+ 'itemName','itemBrand','itemPurchase','itemPrice','itemUsePeriod','itemPros','itemCons',
+ 'travelDest','travelPeriod','travelTransport','travelLodging','travelCompanion','travelSpots','travelCost',
+ 'reviewSubject','reviewVenue','reviewDate','reviewCost','reviewContent','reviewImpression','extra'
+].forEach(id => { document.getElementById(id)?.addEventListener('input', autosave); });
+
+function autosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    const draft = getDraftData();
+    localStorage.setItem('blog_draft', JSON.stringify(draft));
+  }, 1000);
+}
+
+function getDraftData() {
+  const g = id => document.getElementById(id)?.value || '';
+  return {
+    blog_type: selectedBlogType, category: selectedCategory,
+    length: selectedLength, tone: selectedTone, stars: {...stars},
+    photoCount: document.getElementById('photoCount').value,
+    extra: g('extra'),
+    // 맛집
+    restaurant: g('restaurant'), address: g('address'), hours: g('hours'),
+    menus: g('menus'), price: g('price'), companion: g('companion'),
+    distance: g('distance'), atmosphere: g('atmosphere'),
+    parking: document.getElementById('chkParking').checked,
+    waiting: document.getElementById('chkWaiting').checked,
+    reservation: document.getElementById('chkReservation').checked,
+    // 아이템
+    item_name: g('itemName'), brand: g('itemBrand'), purchase: g('itemPurchase'),
+    item_price: g('itemPrice'), use_period: g('itemUsePeriod'),
+    pros: g('itemPros'), cons: g('itemCons'),
+    // 여행
+    destination: g('travelDest'), period: g('travelPeriod'), transport: g('travelTransport'),
+    lodging: g('travelLodging'), t_companion: g('travelCompanion'),
+    spots: g('travelSpots'), total_cost: g('travelCost'),
+    // 후기
+    subject: g('reviewSubject'), venue: g('reviewVenue'), review_date: g('reviewDate'),
+    review_cost: g('reviewCost'), review_content: g('reviewContent'), impression: g('reviewImpression'),
+  };
+}
+
+function loadDraft() {
+  const raw = localStorage.getItem('blog_draft');
+  if (!raw) return;
+  const d = JSON.parse(raw);
+
+  if (d.blog_type) {
+    selectedBlogType = d.blog_type;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === d.blog_type));
+    document.querySelectorAll('.type-fields').forEach(f => f.classList.toggle('active', f.dataset.for === d.blog_type));
+  }
+
+  const fieldMap = {
+    restaurant:'restaurant', address:'address', hours:'hours', menus:'menus',
+    price:'price', companion:'companion', distance:'distance', atmosphere:'atmosphere',
+    item_name:'itemName', brand:'itemBrand', purchase:'itemPurchase', item_price:'itemPrice',
+    use_period:'itemUsePeriod', pros:'itemPros', cons:'itemCons',
+    destination:'travelDest', period:'travelPeriod', transport:'travelTransport',
+    lodging:'travelLodging', t_companion:'travelCompanion', spots:'travelSpots', total_cost:'travelCost',
+    subject:'reviewSubject', venue:'reviewVenue', review_date:'reviewDate', review_cost:'reviewCost',
+    review_content:'reviewContent', impression:'reviewImpression', extra:'extra',
+  };
+  Object.entries(fieldMap).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el && d[key] !== undefined) el.value = d[key];
+  });
+
+  if (d.category) {
+    selectedCategory = d.category;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.value === d.category));
+  }
+  if (d.length) {
+    selectedLength = d.length;
+    document.querySelectorAll('.len-btn').forEach(b => b.classList.toggle('active', b.dataset.value === d.length));
+  }
+  if (d.tone) {
+    selectedTone = d.tone;
+    document.querySelectorAll('.tone-btn').forEach(b => b.classList.toggle('active', b.dataset.value === d.tone));
+  }
+  if (d.stars) {
+    stars = { ...stars, ...d.stars };
+    document.querySelectorAll('.stars').forEach(c => updateStars(c, stars[c.dataset.key] || 0));
+  }
+  if (d.parking)     document.getElementById('chkParking').checked = true;
+  if (d.waiting)     document.getElementById('chkWaiting').checked = true;
+  if (d.reservation) document.getElementById('chkReservation').checked = true;
+  if (d.photoCount)  document.getElementById('photoCount').value = d.photoCount;
+}
+loadDraft();
+
+// ═══════════════════════════════════════
+// 글 생성
+// ═══════════════════════════════════════
+function buildPayload() {
+  const g = id => document.getElementById(id)?.value || '';
+  const common = {
+    blog_type: selectedBlogType, category: selectedCategory,
+    length: selectedLength, tone: selectedTone,
+    photo_count: parseInt(document.getElementById('photoCount').value),
+    extra: g('extra'), stars: {...stars},
+  };
+  if (selectedBlogType === 'restaurant') {
+    return { ...common,
+      restaurant: g('restaurant'), address: g('address'), hours: g('hours'),
+      menus: g('menus'), price: g('price'), companion: g('companion'),
+      distance: g('distance'), atmosphere: g('atmosphere'),
+      parking: document.getElementById('chkParking').checked,
+      waiting: document.getElementById('chkWaiting').checked,
+      reservation: document.getElementById('chkReservation').checked,
+    };
+  } else if (selectedBlogType === 'item') {
+    return { ...common,
+      item_name: g('itemName'), brand: g('itemBrand'), purchase: g('itemPurchase'),
+      item_price: g('itemPrice'), use_period: g('itemUsePeriod'),
+      pros: g('itemPros'), cons: g('itemCons'),
+    };
+  } else if (selectedBlogType === 'travel') {
+    return { ...common,
+      destination: g('travelDest'), period: g('travelPeriod'), transport: g('travelTransport'),
+      lodging: g('travelLodging'), companion: g('travelCompanion'),
+      spots: g('travelSpots'), total_cost: g('travelCost'),
+    };
+  } else if (selectedBlogType === 'review') {
+    return { ...common,
+      subject: g('reviewSubject'), venue: g('reviewVenue'), review_date: g('reviewDate'),
+      review_cost: g('reviewCost'), review_content: g('reviewContent'), impression: g('reviewImpression'),
+    };
+  }
+  return common;
+}
+
+async function generatePost(isRegen = false) {
+  if (!isRegen) {
+    const g = id => document.getElementById(id)?.value.trim() || '';
+    const required = {
+      restaurant: [g('restaurant'), '가게명', g('address'), '주소', g('menus'), '메뉴'],
+      item:       [g('itemName'), '제품명'],
+      travel:     [g('travelDest'), '여행지'],
+      review:     [g('reviewSubject'), '대상/제목'],
+    }[selectedBlogType] || [];
+    for (let i = 0; i < required.length; i += 2) {
+      if (!required[i]) { alert(`${required[i+1]}은(는) 필수입니다!`); return; }
+    }
+  }
+
+  const payload = isRegen ? lastPayload : buildPayload();
+  lastPayload = payload;
+
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true; btn.textContent = '⏳ 생성 중...';
+  document.getElementById('resultArea').innerHTML = `<div class="placeholder"><div class="p-icon">⏳</div><p>AI가 블로그 글을 작성 중이에요...</p></div>`;
+  ['titleCard','hashtagCard','instaCard','thumbCard'].forEach(id => document.getElementById(id).style.display = 'none');
+
+  try {
+    const res  = await fetch('/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error + (data.raw ? '\n' + data.raw : ''));
+
+    // 제목
+    document.getElementById('titleCard').style.display = 'block';
+    const titleList = document.getElementById('titleList');
+    titleList.innerHTML = '';
+    const titles = Array.isArray(data.titles) ? data.titles
+                 : typeof data.titles === 'string' ? data.titles.split('\n').map(s=>s.replace(/^\d+\.\s*/,'')).filter(Boolean)
+                 : [];
+    titles.forEach((t, i) => {
+      const el = document.createElement('div');
+      el.className = 'title-option' + (i === 0 ? ' selected' : '');
+      el.innerHTML = `<span class="title-num">${i + 1}</span><span>${t}</span>`;
+      el.onclick = () => {
+        document.querySelectorAll('.title-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('postTitle').value = t;
+      };
+      titleList.appendChild(el);
+    });
+    if (titles.length) document.getElementById('postTitle').value = titles[0];
+
+    // 해시태그
+    document.getElementById('hashtagCard').style.display = 'block';
+    document.getElementById('hashtagBox').textContent    = data.hashtags;
+
+    // 인스타
+    document.getElementById('instaCard').style.display = 'block';
+    document.getElementById('instaBox').textContent    = data.instagram;
+
+    // 썸네일
+    document.getElementById('thumbCard').style.display = 'block';
+    document.getElementById('thumbText').textContent   = data.thumbnail;
+
+    // 본문 — data.content를 innerHTML에 직접 넣으면 백틱/특수문자로 에러나므로 .value로 분리
+    document.getElementById('resultArea').innerHTML = `
+      <textarea class="post-preview" id="postContent" rows="20"></textarea>
+      <div class="char-bar-wrap">
+        <div class="char-bar-info">
+          <span id="charCountText">0자</span>
+          <span style="color:#9ca3af;">권장: 1,500~2,000자</span>
+        </div>
+        <div class="char-bar-track"><div class="char-bar-fill" id="charBarFill" style="width:0%"></div></div>
+      </div>
+      <div class="result-btns">
+        <button class="btn-action btn-regen" onclick="generatePost(true)">🔄 다시 생성</button>
+        <button class="btn-action btn-copy"  onclick="copyContent(this)">📋 본문 복사</button>
+        ${getBlogButtonHTML()}
+      </div>
+      <p class="tip">💡 복사 후 네이버 블로그 에디터에 붙여넣기 하세요</p>`;
+    document.getElementById('postContent').value = data.content;
+
+    updateCharBar();
+    updateSeoChecklist(data.content, data.hashtags, stars);
+    document.getElementById('postContent').addEventListener('input', () => { updateCharBar(); updateSeoChecklist(document.getElementById('postContent').value, data.hashtags, stars); });
+
+    if (!isRegen) saveHistory(payload);
+
+  } catch(e) {
+    console.error('generatePost error:', e);
+    document.getElementById('resultArea').innerHTML = `<div class="placeholder"><div class="p-icon">❌</div><p>오류: ${e.message || '알 수 없는 오류'}</p><p style="font-size:0.8rem;margin-top:6px;">브라우저 콘솔(F12)에서 자세한 내용을 확인하세요</p></div>`;
+  }
+
+  btn.disabled = false; btn.textContent = '✍️ 블로그 글 자동 생성';
+}
+
+// ═══════════════════════════════════════
+// 글자수 바
+// ═══════════════════════════════════════
+function updateCharBar() {
+  const content = document.getElementById('postContent');
+  const fill    = document.getElementById('charBarFill');
+  const text    = document.getElementById('charCountText');
+  if (!content || !fill || !text) return;
+  const len = content.value.length;
+  text.textContent = `${len.toLocaleString()}자`;
+  const pct = Math.min((len / 2000) * 100, 100);
+  fill.style.width = pct + '%';
+  if (len < 1000)       { fill.style.background = '#ef4444'; }
+  else if (len <= 2000) { fill.style.background = '#4F7FFF'; }
+  else                  { fill.style.background = '#f59e0b'; }
+}
+
+// ═══════════════════════════════════════
+// SEO 체크리스트
+// ═══════════════════════════════════════
+function updateSeoChecklist(content, hashtags, starsData) {
+  if (!content || !hashtags) return;
+  const len     = content.length;
+  const photos  = (content.match(/\[사진/g) || []).length;
+  const tags    = (hashtags.match(/#\S+/g) || []).length;
+  const hasStars = Object.values(starsData).some(v => v > 0);
+  const hasAddr  = document.getElementById('address').value.trim().length > 5;
+
+  const checks = [
+    {
+      label: '글자수',
+      ok: len >= 1500,
+      warn: len >= 1000 && len < 1500,
+      badge: `${len.toLocaleString()}자 ${len >= 1500 ? '✅' : len >= 1000 ? '⚠️' : '❌'}`,
+    },
+    {
+      label: '사진 개수 ([사진] 태그)',
+      ok: photos >= 5,
+      warn: photos >= 3,
+      badge: `${photos}개 ${photos >= 5 ? '✅' : photos >= 3 ? '⚠️' : '❌'}`,
+    },
+    {
+      label: '해시태그 (키워드)',
+      ok: tags >= 10,
+      warn: tags >= 5,
+      badge: `${tags}개 ${tags >= 10 ? '✅' : tags >= 5 ? '⚠️' : '❌'}`,
+    },
+    {
+      label: '별점 포함 여부',
+      ok: hasStars,
+      warn: false,
+      badge: hasStars ? '포함 ✅' : '미포함 ❌',
+    },
+    {
+      label: '주소/위치 정보',
+      ok: hasAddr,
+      warn: false,
+      badge: hasAddr ? '포함 ✅' : '미입력 ❌',
+    },
+  ];
+
+  const list = document.getElementById('seoList');
+  list.innerHTML = checks.map(c => {
+    const cls = c.ok ? 'good' : c.warn ? 'warn' : 'bad';
+    return `<div class="seo-item">
+      <div class="seo-dot ${cls}"></div>
+      <div class="seo-text">${c.label}</div>
+      <span class="seo-badge ${cls}">${c.badge}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// 복사
+// ═══════════════════════════════════════
+async function copyText(id, el) {
+  const text = document.getElementById(id)?.textContent || el.textContent;
+  await navigator.clipboard.writeText(text);
+  const orig = el.style.opacity;
+  el.style.opacity = '0.6';
+  setTimeout(() => el.style.opacity = orig, 600);
+}
+
+async function copyContent(btn) {
+  const c = document.getElementById('postContent')?.value;
+  if (!c) return;
+  await navigator.clipboard.writeText(c);
+  btn.textContent = '✅ 복사됨!';
+  setTimeout(() => btn.textContent = '📋 본문 복사', 2000);
+}
+
+// ═══════════════════════════════════════
+// 방문 기록
+// ═══════════════════════════════════════
+function saveHistory(payload) {
+  const list = getHistory();
+  const displayName = payload.restaurant || payload.item_name || payload.destination || payload.subject || '제목 없음';
+  list.unshift({
+    name: displayName, category: payload.category,
+    blog_type: payload.blog_type,
+    address: payload.address || payload.venue || payload.destination || '',
+    date: new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }),
+    ts: Date.now()
+  });
+  localStorage.setItem('blog_history', JSON.stringify(list.slice(0, 50)));
+  renderHistory();
+}
+
+function getHistory() {
+  const raw = localStorage.getItem('blog_history');
+  return raw ? JSON.parse(raw) : [];
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const data = getHistory();
+  if (!data.length) { list.innerHTML = '<div class="empty-msg">아직 방문 기록이 없어요</div>'; return; }
+  list.innerHTML = data.map((h, i) => `
+    <div class="history-item" onclick="loadHistory(${i})">
+      <div class="history-info">
+        <div class="history-name">${h.category ? `[${h.category}] ` : ''}${h.name}</div>
+        <div class="history-meta">${h.address} · ${h.date}</div>
+      </div>
+      <button class="btn-del" onclick="deleteHistory(event,${i})">✕</button>
+    </div>`).join('');
+}
+
+function loadHistory(idx) {
+  const h = getHistory()[idx];
+  if (!h) return;
+  document.getElementById('restaurant').value = h.name;
+  document.getElementById('address').value    = h.address;
+  if (h.category) {
+    selectedCategory = h.category;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.value === h.category));
+  }
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function deleteHistory(e, idx) {
+  e.stopPropagation();
+  const list = getHistory(); list.splice(idx, 1);
+  localStorage.setItem('blog_history', JSON.stringify(list));
+  renderHistory();
+}
+
+renderHistory();
+
+// ═══════════════════════════════════════
+// 블로그 URL 관리
+// ═══════════════════════════════════════
+function getBlogUrls() {
+  const raw = localStorage.getItem('blog_urls');
+  return raw ? JSON.parse(raw) : [
+    { name: '내 블로그 (leesel133)', url: 'https://blog.naver.com/leesel133/postwrite' },
+    { name: '블로그2 (whdcks111)',   url: 'https://blog.naver.com/whdcks111/postwrite' },
+  ];
+}
+function saveBlogUrls(list) { localStorage.setItem('blog_urls', JSON.stringify(list)); }
+
+function addBlogUrl() {
+  const name = document.getElementById('blogUrlName').value.trim();
+  const url  = document.getElementById('blogUrlInput').value.trim();
+  if (!name || !url) { alert('이름과 URL을 모두 입력해주세요!'); return; }
+  const list = getBlogUrls();
+  list.push({ name, url });
+  saveBlogUrls(list);
+  document.getElementById('blogUrlName').value = '';
+  document.getElementById('blogUrlInput').value = '';
+  renderBlogUrls();
+}
+
+function deleteBlogUrl(idx) {
+  const list = getBlogUrls(); list.splice(idx, 1);
+  saveBlogUrls(list); renderBlogUrls();
+}
+
+function renderBlogUrls() {
+  const list = getBlogUrls();
+  const el   = document.getElementById('blogUrlList');
+  el.innerHTML = list.length
+    ? list.map((b, i) => `
+      <div class="blogurl-item">
+        <div class="blogurl-info">
+          <div class="blogurl-name">${b.name}</div>
+          <div class="blogurl-url">${b.url}</div>
+        </div>
+        <button class="btn-del" onclick="deleteBlogUrl(${i})">✕</button>
+      </div>`).join('')
+    : '<div class="empty-msg">등록된 블로그가 없어요</div>';
+}
+renderBlogUrls();
+
+function getBlogButtonHTML() {
+  const blogs = getBlogUrls();
+  const naverIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/></svg>`;
+  if (!blogs.length) return '';
+  if (blogs.length === 1) {
+    return `<a class="btn-action btn-naver" href="${blogs[0].url}" target="_blank">${naverIcon} 블로그 열기</a>`;
+  }
+  const items = blogs.map(b => `<a class="blog-dd-item" href="${b.url}" target="_blank">${b.name}</a>`).join('');
+  return `<div class="blog-dropdown-wrap">
+    <button class="btn-action btn-naver" onclick="toggleBlogDropdown(this)" style="width:100%;">${naverIcon} 블로그 열기 ▾</button>
+    <div class="blog-dropdown" style="display:none;">${items}</div>
+  </div>`;
+}
+
+function toggleBlogDropdown(btn) {
+  const dd = btn.nextElementSibling;
+  const isOpen = dd.style.display !== 'none';
+  dd.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    const close = (e) => { if (!btn.parentElement.contains(e.target)) { dd.style.display='none'; document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+
+// ═══════════════════════════════════════
+// 통계
+// ═══════════════════════════════════════
+let chartMonthly = null, chartCategory = null;
+
+function renderStats() {
+  const history = getHistory();
+  const now = new Date();
+
+  const thisMonth = history.filter(h => h.date && h.date.includes(`${now.getFullYear()}년 ${now.getMonth()+1}월`)).length;
+  const topCat = (() => {
+    const cnt = {};
+    history.forEach(h => { if (h.category) cnt[h.category] = (cnt[h.category]||0)+1; });
+    return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]?.[0] || '-';
+  })();
+
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card sc-total"><div class="sc-icon">📝</div><div class="sc-label">총 포스팅</div><div class="sc-value">${history.length}개</div></div>
+    <div class="stat-card sc-month"><div class="sc-icon">📅</div><div class="sc-label">이번 달</div><div class="sc-value">${thisMonth}개</div></div>
+    <div class="stat-card sc-cat"><div class="sc-icon">🍜</div><div class="sc-label">최다 카테고리</div><div class="sc-value">${topCat}</div></div>
+  `;
+
+  // 월별 차트
+  const months = Array.from({length:6}, (_,i) => {
+    const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
+    return { label: `${d.getMonth()+1}월`, year: d.getFullYear(), month: d.getMonth()+1 };
+  });
+  const monthCounts = months.map(m =>
+    history.filter(h => h.date && h.date.includes(`${m.year}년 ${m.month}월`)).length
+  );
+
+  if (chartMonthly) chartMonthly.destroy();
+  chartMonthly = new Chart(document.getElementById('chartMonthly'), {
+    type:'bar',
+    data:{ labels: months.map(m=>m.label), datasets:[{ data: monthCounts, backgroundColor:'#4F7FFF', borderRadius:6 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, ticks:{stepSize:1}} } }
+  });
+
+  // 카테고리 차트
+  const catMap = {};
+  history.forEach(h => { const c = h.category||'기타'; catMap[c] = (catMap[c]||0)+1; });
+  const catLabels = Object.keys(catMap);
+  const catData   = Object.values(catMap);
+  const colors = ['#4F7FFF','#6366F1','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#3B82F6','#f97316'];
+
+  if (chartCategory) chartCategory.destroy();
+  if (catLabels.length) {
+    chartCategory = new Chart(document.getElementById('chartCategory'), {
+      type:'doughnut',
+      data:{ labels: catLabels, datasets:[{ data: catData, backgroundColor: colors.slice(0,catLabels.length), borderWidth:0 }] },
+      options:{ plugins:{ legend:{ position:'right', labels:{ font:{ family:'Noto Sans KR', size:12 } } } } }
+    });
+  } else {
+    document.getElementById('chartCategory').parentElement.innerHTML += '<div class="empty-msg">아직 데이터가 없어요</div>';
+  }
+}
+
+// ═══════════════════════════════════════
+// 위시리스트
+// ═══════════════════════════════════════
+function getWishlist() { const r = localStorage.getItem('blog_wishlist'); return r ? JSON.parse(r) : []; }
+function saveWishlist(list) { localStorage.setItem('blog_wishlist', JSON.stringify(list)); }
+
+function addWish() {
+  const name = document.getElementById('wishName').value.trim();
+  if (!name) { alert('가게명을 입력해주세요!'); return; }
+  const list = getWishlist();
+  list.unshift({ name, category: document.getElementById('wishCategory').value.trim(), memo: document.getElementById('wishMemo').value.trim(), done: false, ts: Date.now() });
+  saveWishlist(list);
+  document.getElementById('wishName').value = '';
+  document.getElementById('wishCategory').value = '';
+  document.getElementById('wishMemo').value = '';
+  renderWishlist();
+}
+
+function renderWishlist() {
+  const list = getWishlist();
+  const el   = document.getElementById('wishList');
+  if (!list.length) { el.innerHTML = '<div class="empty-msg">가고 싶은 맛집을 추가해보세요!</div>'; return; }
+  el.innerHTML = list.map((w, i) => `
+    <div class="wish-item ${w.done ? 'done' : ''}">
+      <input type="checkbox" class="wish-check" ${w.done ? 'checked' : ''} onchange="toggleWish(${i})" />
+      <div class="wish-info">
+        <div class="wish-name">${w.category ? `[${w.category}] ` : ''}${w.name}</div>
+        ${w.memo ? `<div class="wish-meta">${w.memo}</div>` : ''}
+      </div>
+      <button class="btn-del" onclick="deleteWish(${i})">✕</button>
+    </div>`).join('');
+}
+
+function toggleWish(idx) {
+  const list = getWishlist(); list[idx].done = !list[idx].done;
+  saveWishlist(list); renderWishlist();
+}
+
+function deleteWish(idx) {
+  const list = getWishlist(); list.splice(idx, 1);
+  saveWishlist(list); renderWishlist();
+}
+
+renderWishlist();
+
+// ═══════════════════════════════════════
+// 포스팅 캘린더
+// ═══════════════════════════════════════
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calSelectedDate = null;
+
+function getPlans() { const r = localStorage.getItem('blog_plans'); return r ? JSON.parse(r) : {}; }
+function savePlans(plans) { localStorage.setItem('blog_plans', JSON.stringify(plans)); }
+
+function moveCalMonth(dir) { calMonth += dir; if (calMonth < 0) { calMonth=11; calYear--; } if (calMonth > 11) { calMonth=0; calYear++; } renderCalendar(); }
+
+function renderCalendar() {
+  document.getElementById('calTitle').textContent = `${calYear}년 ${calMonth+1}월`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['일','월','화','수','목','금','토'].forEach(h => {
+    const el = document.createElement('div'); el.className='cal-header'; el.textContent=h; grid.appendChild(el);
+  });
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const days     = new Date(calYear, calMonth+1, 0).getDate();
+  const today    = new Date();
+  const plans    = getPlans();
+
+  for (let i=0; i<firstDay; i++) { const e=document.createElement('div'); e.className='cal-cell empty'; grid.appendChild(e); }
+
+  for (let d=1; d<=days; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(calYear, calMonth, d).getDay();
+    const plan = plans[dateStr];
+    const isToday = today.getFullYear()===calYear && today.getMonth()===calMonth && today.getDate()===d;
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (dow===0?' sunday':dow===6?' saturday':'') + (isToday?' today':'') + (plan?' has-plan':'');
+    cell.innerHTML = `<div class="cal-day">${d}</div>${plan ? `<div class="cal-plan-dot">예정</div><div class="cal-plan-text">${plan.name}</div>` : ''}`;
+    cell.addEventListener('click', () => openCalModal(dateStr, d, plan));
+    grid.appendChild(cell);
+  }
+}
+
+function openCalModal(dateStr, day, plan) {
+  calSelectedDate = dateStr;
+  document.getElementById('calModalTitle').textContent = `${calYear}년 ${calMonth+1}월 ${day}일`;
+  document.getElementById('calPlanName').value  = plan?.name  || '';
+  document.getElementById('calPlanNote').value  = plan?.note  || '';
+  document.getElementById('calBtnDel').style.display = plan ? 'block' : 'none';
+  document.getElementById('calModal').classList.add('open');
+}
+
+function closeCalModal() { document.getElementById('calModal').classList.remove('open'); calSelectedDate=null; }
+
+function savePlan() {
+  if (!calSelectedDate) return;
+  const name = document.getElementById('calPlanName').value.trim();
+  if (!name) { alert('맛집 이름을 입력해주세요!'); return; }
+  const plans = getPlans();
+  plans[calSelectedDate] = { name, note: document.getElementById('calPlanNote').value };
+  savePlans(plans); closeCalModal(); renderCalendar();
+}
+
+function deletePlan() {
+  if (!calSelectedDate) return;
+  const plans = getPlans(); delete plans[calSelectedDate];
+  savePlans(plans); closeCalModal(); renderCalendar();
+}
+
+document.getElementById('calModal').addEventListener('click', e => { if (e.target===document.getElementById('calModal')) closeCalModal(); });
+
+renderCalendar();
+
+// ── 가이드 팝업 ──
+function openGuide()  { document.getElementById('guideOverlay').classList.add('open'); }
+function closeGuide() { document.getElementById('guideOverlay').classList.remove('open'); }
+
+function switchGuideTab(btn) {
+  document.querySelectorAll('.guide-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.guide-section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('guide-' + btn.dataset.guide).classList.add('active');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGuide(); });
+</script>
+</body>
+</html>
